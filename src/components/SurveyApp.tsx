@@ -2,6 +2,10 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
+  emptyTableRows,
+  type SurveyAnswers,
+} from "@/lib/answers";
+import {
   isQuestion,
   QUESTION_COUNT,
   SCHEMA,
@@ -13,10 +17,13 @@ import {
   submitResponse,
   type SurveyResponse,
 } from "@/lib/storage";
+import QuestionField from "@/components/QuestionField";
+import { renderAllQuestionStats } from "@/components/QuestionStats";
 
 function responseKey(r: SurveyResponse): string {
   return String(r.id ?? r._ts);
 }
+
 type Panel = "form" | "stats";
 
 type Meta = {
@@ -52,6 +59,16 @@ function buildQuestionSections() {
 
 const QUESTION_SECTIONS = buildQuestionSections();
 
+function initTableState(): Record<string, string[][]> {
+  const tables: Record<string, string[][]> = {};
+  for (const item of SCHEMA) {
+    if (isQuestion(item) && (item.type === "table3" || item.type === "table2")) {
+      tables[item.id] = emptyTableRows(item.type);
+    }
+  }
+  return tables;
+}
+
 export default function SurveyApp() {
   const [panel, setPanel] = useState<Panel>("form");
   const [meta, setMeta] = useState<Meta>(emptyMeta);
@@ -59,6 +76,13 @@ export default function SurveyApp() {
   const [toast, setToast] = useState("");
   const [toastVisible, setToastVisible] = useState(false);
   const [checkedKeys, setCheckedKeys] = useState<Record<string, boolean>>({});
+  const [textValues, setTextValues] = useState<Record<string, string>>({});
+  const [rankValues, setRankValues] = useState<
+    Record<string, Record<string, string>>
+  >({});
+  const [tableValues, setTableValues] = useState<Record<string, string[][]>>(
+    initTableState,
+  );
   const [formKey, setFormKey] = useState(0);
   const importRef = useRef<HTMLInputElement>(null);
   const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -106,21 +130,40 @@ export default function SurveyApp() {
     });
   };
 
-  const collectAnswers = (): Record<string, string | string[]> => {
-    const answers: Record<string, string | string[]> = {};
+  const collectAnswers = (): SurveyAnswers => {
+    const answers: SurveyAnswers = {};
+
     for (const item of SCHEMA) {
       if (!isQuestion(item)) continue;
+
       if (item.type === "text") {
-        const el = document.getElementById(item.id) as HTMLTextAreaElement | null;
-        answers[item.id] = el?.value.trim() ?? "";
-      } else {
-        const checked = Object.entries(checkedKeys)
+        answers[item.id] = textValues[item.id]?.trim() ?? "";
+      } else if (item.type === "multi") {
+        answers[item.id] = Object.entries(checkedKeys)
           .filter(([k, v]) => v && k.startsWith(`${item.id}::`))
           .map(([k]) => k.slice(item.id.length + 2));
-        answers[item.id] =
-          item.type === "multi" ? checked : (checked[0] ?? "");
+      } else if (item.type === "single") {
+        const checked = Object.entries(checkedKeys).find(
+          ([k, v]) => v && k.startsWith(`${item.id}::`),
+        );
+        answers[item.id] = checked
+          ? checked[0].slice(item.id.length + 2)
+          : "";
+      } else if (item.type === "rank") {
+        const map = rankValues[item.id] ?? {};
+        const filtered: Record<string, string> = {};
+        for (const [opt, val] of Object.entries(map)) {
+          if (val.trim()) filtered[opt] = val.trim();
+        }
+        answers[item.id] = filtered;
+      } else if (item.type === "table3" || item.type === "table2") {
+        const rows = (tableValues[item.id] ?? []).map((row) =>
+          row.map((c) => c.trim()),
+        );
+        answers[item.id] = rows.filter((row) => row.some((c) => c));
       }
     }
+
     return answers;
   };
 
@@ -146,13 +189,16 @@ export default function SurveyApp() {
       showToast(`✓ Ответы сохранены! Спасибо, ${dept}`);
       clearForm();
     } catch {
-      showToast("Ошибка сохранения. Проверьте .env.local");
+      showToast("Ошибка сохранения");
     }
   };
 
   const clearForm = () => {
     setMeta(emptyMeta);
     setCheckedKeys({});
+    setTextValues({});
+    setRankValues({});
+    setTableValues(initTableState());
     setFormKey((k) => k + 1);
   };
 
@@ -197,95 +243,7 @@ export default function SurveyApp() {
         </div>
       );
     }
-
-    let n = 0;
-    const blocks: React.ReactNode[] = [];
-
-    for (const item of SCHEMA) {
-      if (!isQuestion(item)) {
-        blocks.push(
-          <div key={item.section} className="survey-sec-title">
-            {item.section}
-          </div>,
-        );
-        continue;
-      }
-
-      n += 1;
-      const qNum = n;
-
-      if (item.type === "text") {
-        const rows = responses
-          .filter((r) => r.answers[item.id])
-          .map((r) => (
-            <div key={responseKey(r)} className="survey-ta">
-              <b>{r.dept}:</b> {String(r.answers[item.id])}
-            </div>
-          ));
-
-        blocks.push(
-          <div key={item.id} className="survey-bar-q">
-            <h4>
-              <span style={{ color: "var(--teal)", fontWeight: 800 }}>
-                {qNum}.
-              </span>{" "}
-              {item.label}
-            </h4>
-            <div className="survey-text-answers">
-              {rows.length ? (
-                rows
-              ) : (
-                <span style={{ color: "var(--gray)", fontSize: 13 }}>
-                  Нет ответов
-                </span>
-              )}
-            </div>
-          </div>,
-        );
-      } else {
-        const counts: Record<string, number> = {};
-        for (const o of item.options ?? []) counts[o] = 0;
-        for (const r of responses) {
-          const v = r.answers[item.id];
-          if (Array.isArray(v)) {
-            for (const x of v) {
-              if (x in counts) counts[x] += 1;
-            }
-          } else if (v && v in counts) {
-            counts[v] += 1;
-          }
-        }
-        const max = Math.max(1, ...Object.values(counts));
-
-        blocks.push(
-          <div key={item.id} className="survey-bar-q">
-            <h4>
-              <span style={{ color: "var(--teal)", fontWeight: 800 }}>
-                {qNum}.
-              </span>{" "}
-              {item.label}
-            </h4>
-            {(item.options ?? []).map((o) => {
-              const c = counts[o];
-              return (
-                <div key={o} className="survey-bar-row">
-                  <div className="survey-bar-label">{o}</div>
-                  <div className="survey-bar-track">
-                    <div
-                      className="survey-bar-fill"
-                      style={{ width: `${(c / max) * 100}%` }}
-                    />
-                  </div>
-                  <div className="survey-bar-val">{c}</div>
-                </div>
-              );
-            })}
-          </div>,
-        );
-      }
-    }
-
-    return <>{blocks}</>;
+    return <>{renderAllQuestionStats(responses)}</>;
   }, [responses]);
 
   return (
@@ -398,41 +356,31 @@ export default function SurveyApp() {
                   {item.hint ? (
                     <div className="survey-q-hint">{item.hint}</div>
                   ) : null}
-                  {item.type === "text" ? (
-                    <textarea
-                      id={item.id}
-                      placeholder="Ваш ответ…"
-                      defaultValue=""
-                    />
-                  ) : (
-                    (item.options ?? []).map((opt) => {
-                      const key = optionKey(item.id, opt);
-                      const inputType =
-                        item.type === "multi" ? "checkbox" : "radio";
-                      return (
-                        <label
-                          key={opt}
-                          className={`survey-opt${checkedKeys[key] ? " checked" : ""}`}
-                        >
-                          <input
-                            type={inputType}
-                            name={item.id}
-                            value={opt}
-                            checked={!!checkedKeys[key]}
-                            onChange={(e) =>
-                              toggleOption(
-                                item.id,
-                                opt,
-                                item.type as "single" | "multi",
-                                e.target.checked,
-                              )
-                            }
-                          />
-                          <span>{opt}</span>
-                        </label>
-                      );
-                    })
-                  )}
+                  <QuestionField
+                    item={item}
+                    checkedKeys={checkedKeys}
+                    onToggleOption={toggleOption}
+                    rankValues={rankValues[item.id] ?? {}}
+                    onRankChange={(opt, val) =>
+                      setRankValues((prev) => ({
+                        ...prev,
+                        [item.id]: { ...(prev[item.id] ?? {}), [opt]: val },
+                      }))
+                    }
+                    tableRows={
+                      tableValues[item.id] ??
+                      emptyTableRows(
+                        item.type === "table3" ? "table3" : "table2",
+                      )
+                    }
+                    onTableChange={(rows) =>
+                      setTableValues((prev) => ({ ...prev, [item.id]: rows }))
+                    }
+                    textValues={textValues}
+                    onTextChange={(val) =>
+                      setTextValues((prev) => ({ ...prev, [item.id]: val }))
+                    }
+                  />
                 </div>
               ))}
             </div>

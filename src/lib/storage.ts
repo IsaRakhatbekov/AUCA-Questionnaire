@@ -1,3 +1,5 @@
+import type { SurveyAnswers } from "@/lib/answers";
+
 export type SurveyResponse = {
   id?: number;
   _ts: number;
@@ -5,7 +7,7 @@ export type SurveyResponse = {
   name: string;
   role: string;
   contact: string;
-  answers: Record<string, string | string[]>;
+  answers: SurveyAnswers;
 };
 
 async function apiError(res: Response, fallback: string): Promise<never> {
