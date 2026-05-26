@@ -1,8 +1,13 @@
 import { NextResponse } from "next/server";
 import { rowToResponse } from "@/lib/db";
-import { getSupabase } from "@/lib/supabase-server";
+import { getSupabase, getSupabaseEnvError } from "@/lib/supabase-server";
 
 export async function GET() {
+  const envError = getSupabaseEnvError();
+  if (envError) {
+    return NextResponse.json({ error: envError }, { status: 503 });
+  }
+
   try {
     const supabase = getSupabase();
     const { data, error } = await supabase
@@ -18,6 +23,7 @@ export async function GET() {
     return NextResponse.json((data ?? []).map(rowToResponse));
   } catch (e) {
     console.error(e);
-    return NextResponse.json({ error: "Server error" }, { status: 500 });
+    const message = e instanceof Error ? e.message : "Server error";
+    return NextResponse.json({ error: message }, { status: 500 });
   }
 }

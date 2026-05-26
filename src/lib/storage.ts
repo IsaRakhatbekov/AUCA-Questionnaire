@@ -8,9 +8,19 @@ export type SurveyResponse = {
   answers: Record<string, string | string[]>;
 };
 
+async function apiError(res: Response, fallback: string): Promise<never> {
+  try {
+    const data = (await res.json()) as { error?: string };
+    throw new Error(data.error || fallback);
+  } catch (e) {
+    if (e instanceof Error && e.message !== fallback) throw e;
+    throw new Error(fallback);
+  }
+}
+
 export async function loadAll(): Promise<SurveyResponse[]> {
   const res = await fetch("/api/responses", { cache: "no-store" });
-  if (!res.ok) throw new Error("Не удалось загрузить ответы");
+  if (!res.ok) await apiError(res, "Не удалось загрузить ответы");
   return res.json() as Promise<SurveyResponse[]>;
 }
 
@@ -22,7 +32,7 @@ export async function submitResponse(
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(resp),
   });
-  if (!res.ok) throw new Error("Не удалось сохранить ответ");
+  if (!res.ok) await apiError(res, "Не удалось сохранить ответ");
   return res.json() as Promise<SurveyResponse>;
 }
 
@@ -34,7 +44,7 @@ export async function importResponses(
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ responses }),
   });
-  if (!res.ok) throw new Error("Не удалось импортировать");
+  if (!res.ok) await apiError(res, "Не удалось импортировать");
   const data = (await res.json()) as { added: number };
   return data.added;
 }

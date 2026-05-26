@@ -1,9 +1,14 @@
 import { NextResponse } from "next/server";
 import { responseToRow, rowToResponse } from "@/lib/db";
 import type { SurveyResponse } from "@/lib/storage";
-import { getSupabase } from "@/lib/supabase-server";
+import { getSupabase, getSupabaseEnvError } from "@/lib/supabase-server";
 
 export async function POST(request: Request) {
+  const envError = getSupabaseEnvError();
+  if (envError) {
+    return NextResponse.json({ error: envError }, { status: 503 });
+  }
+
   try {
     const body = (await request.json()) as SurveyResponse;
 
@@ -37,6 +42,7 @@ export async function POST(request: Request) {
     return NextResponse.json(rowToResponse(data));
   } catch (e) {
     console.error(e);
-    return NextResponse.json({ error: "Server error" }, { status: 500 });
+    const message = e instanceof Error ? e.message : "Server error";
+    return NextResponse.json({ error: message }, { status: 500 });
   }
 }

@@ -1,9 +1,14 @@
 import { NextResponse } from "next/server";
 import { responseToRow, rowToResponse } from "@/lib/db";
 import type { SurveyResponse } from "@/lib/storage";
-import { getSupabase } from "@/lib/supabase-server";
+import { getSupabase, getSupabaseEnvError } from "@/lib/supabase-server";
 
 export async function POST(request: Request) {
+  const envError = getSupabaseEnvError();
+  if (envError) {
+    return NextResponse.json({ error: envError }, { status: 503 });
+  }
+
   try {
     const body = (await request.json()) as { responses?: SurveyResponse[] };
     const incoming = body.responses;
