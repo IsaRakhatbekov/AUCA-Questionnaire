@@ -12,7 +12,6 @@ import {
   type SchemaQuestion,
 } from "@/lib/schema";
 import {
-  importResponses,
   loadAll,
   submitResponse,
   type SurveyResponse,
@@ -30,10 +29,9 @@ type Meta = {
   dept: string;
   name: string;
   role: string;
-  contact: string;
 };
 
-const emptyMeta: Meta = { dept: "", name: "", role: "", contact: "" };
+const emptyMeta: Meta = { dept: "", name: "", role: "" };
 
 function buildQuestionSections() {
   const sections: {
@@ -84,7 +82,6 @@ export default function SurveyApp() {
     initTableState,
   );
   const [formKey, setFormKey] = useState(0);
-  const importRef = useRef<HTMLInputElement>(null);
   const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const showToast = useCallback((msg: string) => {
@@ -179,7 +176,7 @@ export default function SurveyApp() {
       dept,
       name: meta.name.trim(),
       role: meta.role.trim(),
-      contact: meta.contact.trim(),
+      contact: "",
       answers: collectAnswers(),
     };
 
@@ -200,31 +197,6 @@ export default function SurveyApp() {
     setRankValues({});
     setTableValues(initTableState());
     setFormKey((k) => k + 1);
-  };
-
-  const exportData = async () => {
-    const all = await loadAll();
-    const blob = new Blob([JSON.stringify(all, null, 2)], {
-      type: "application/json",
-    });
-    const a = document.createElement("a");
-    a.href = URL.createObjectURL(blob);
-    a.download = `auca_survey_${new Date().toISOString().slice(0, 10)}.json`;
-    a.click();
-    URL.revokeObjectURL(a.href);
-    showToast("Файл с ответами скачан");
-  };
-
-  const importData = async (file: File) => {
-    try {
-      const imported = JSON.parse(await file.text()) as SurveyResponse[];
-      if (!Array.isArray(imported)) throw new Error("invalid");
-      const added = await importResponses(imported);
-      await refreshStats();
-      showToast(`Импортировано новых ответов: ${added}`);
-    } catch {
-      showToast("Ошибка: неверный файл");
-    }
   };
 
   const uniqueDepts = useMemo(
@@ -256,11 +228,6 @@ export default function SurveyApp() {
             технического задания.
           </p>
         </header>
-
-        <div className="survey-warn">
-          <b>Общая база включена.</b> Ответы сохраняются в Supabase — статистика
-          общая для всех, кто открывает сайт.
-        </div>
 
         <div className="survey-tabs">
           <button
@@ -324,18 +291,6 @@ export default function SurveyApp() {
                   value={meta.role}
                   onChange={(e) =>
                     setMeta((m) => ({ ...m, role: e.target.value }))
-                  }
-                />
-              </div>
-              <div>
-                <label htmlFor="m_contact">Email / телефон</label>
-                <input
-                  type="text"
-                  id="m_contact"
-                  placeholder="email@auca.kg"
-                  value={meta.contact}
-                  onChange={(e) =>
-                    setMeta((m) => ({ ...m, contact: e.target.value }))
                   }
                 />
               </div>
@@ -441,40 +396,6 @@ export default function SurveyApp() {
                   <span style={{ color: "var(--gray)" }}>Пока нет ответов</span>
                 )}
               </div>
-            </div>
-            <div className="survey-btnrow" style={{ marginTop: 18 }}>
-              <button
-                type="button"
-                className="survey-btn survey-btn-gold"
-                onClick={() => void exportData()}
-              >
-                ⬇ Экспорт всех ответов (JSON)
-              </button>
-              <button
-                type="button"
-                className="survey-btn survey-btn-ghost"
-                onClick={() => importRef.current?.click()}
-              >
-                ⬆ Импорт ответов
-              </button>
-              <input
-                ref={importRef}
-                type="file"
-                accept=".json"
-                style={{ display: "none" }}
-                onChange={(e) => {
-                  const file = e.target.files?.[0];
-                  if (file) void importData(file);
-                  e.target.value = "";
-                }}
-              />
-              <button
-                type="button"
-                className="survey-btn survey-btn-ghost"
-                onClick={() => void refreshStats()}
-              >
-                ↻ Обновить
-              </button>
             </div>
           </div>
           <div>{statsBody}</div>
