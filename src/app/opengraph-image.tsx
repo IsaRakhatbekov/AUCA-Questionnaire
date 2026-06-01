@@ -1,10 +1,15 @@
 import { ImageResponse } from "next/og";
+import { readFile } from "node:fs/promises";
+import { join } from "node:path";
 
 export const alt = "Анкета департаментов AUCA — редизайн сайта";
 export const size = { width: 1200, height: 630 };
 export const contentType = "image/png";
 
-export default function OpenGraphImage() {
+export default async function OpenGraphImage() {
+  const logoBuffer = await readFile(join(process.cwd(), "public/AUCA.jpeg"));
+  const logoSrc = `data:image/jpeg;base64,${logoBuffer.toString("base64")}`;
+
   return new ImageResponse(
     (
       <div
@@ -13,65 +18,25 @@ export default function OpenGraphImage() {
           height: "100%",
           display: "flex",
           flexDirection: "column",
+          alignItems: "center",
           justifyContent: "center",
-          padding: "72px 80px",
           background: "#0F2C5C",
           color: "#ffffff",
           fontFamily: "system-ui, sans-serif",
         }}
       >
-        <div
-          style={{
-            width: 8,
-            height: 64,
-            background: "#A0780A",
-            marginBottom: 32,
-          }}
+        <img
+          src={logoSrc}
+          width={220}
+          height={220}
+          alt=""
+          style={{ objectFit: "contain", marginBottom: 36 }}
         />
-        <div
-          style={{
-            fontSize: 52,
-            fontWeight: 800,
-            lineHeight: 1.15,
-            marginBottom: 24,
-            maxWidth: 900,
-          }}
-        >
+        <div style={{ fontSize: 44, fontWeight: 800, marginBottom: 12 }}>
           Анкета для департаментов
         </div>
-        <div
-          style={{
-            fontSize: 30,
-            fontWeight: 600,
-            color: "#C9D6E8",
-            marginBottom: 40,
-            maxWidth: 900,
-          }}
-        >
+        <div style={{ fontSize: 26, fontWeight: 600, color: "#C9D6E8" }}>
           Редизайн сайта AUCA
-        </div>
-        <div
-          style={{
-            fontSize: 22,
-            color: "#EEF3FA",
-            maxWidth: 820,
-            lineHeight: 1.45,
-          }}
-        >
-          Сбор требований для технического задания. Заполните анкету вашего
-          департамента.
-        </div>
-        <div
-          style={{
-            position: "absolute",
-            bottom: 56,
-            right: 80,
-            fontSize: 20,
-            color: "#0E9594",
-            fontWeight: 700,
-          }}
-        >
-          auca-questionnaire.vercel.app
         </div>
       </div>
     ),

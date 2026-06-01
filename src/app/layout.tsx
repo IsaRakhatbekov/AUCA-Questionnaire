@@ -10,6 +10,10 @@ export const metadata: Metadata = {
   title: "Анкета департаментов — Редизайн сайта AUCA",
   description:
     "Сбор требований для редизайна сайта AUCA. Анкета для департаментов университета.",
+  icons: {
+    icon: "/AUCA.jpeg",
+    apple: "/AUCA.jpeg",
+  },
   openGraph: {
     title: "Анкета департаментов — Редизайн сайта AUCA",
     description:
@@ -17,6 +21,7 @@ export const metadata: Metadata = {
     siteName: "AUCA Questionnaire",
     locale: "ru_RU",
     type: "website",
+    images: [{ url: "/AUCA.jpeg", alt: "AUCA" }],
   },
   twitter: {
     card: "summary_large_image",
